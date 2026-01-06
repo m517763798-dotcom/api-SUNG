@@ -1,11 +1,8 @@
 {
-  "name": "sung-k4-api",
-  "version": "2.0.0",
-  "type": "module",
+  "name": "sung-tiktok-api",
+  "version": "1.0.0",
   "dependencies": {
-    "express": "^4.18.2",
-    "axios": "^1.6.6",
-    "cheerio": "^1.0.0-rc.12",
-    "serverless-http": "^3.0.0"
+    "axios": "^1.8.4",
+    "cheerio": "^1.0.0-rc.12"
   }
 }
