@@ -30,15 +30,16 @@ app.get("/tiktok", async (req, res) => {
       return res.status(404).json({ error: "No download links found." });
     }
 
+    // نأخذ أول رابط فيديو
     const firstVideo = links.find((l) => l.type === "video");
-    const firstAudio = links.find((l) => l.type === "audio");
+
+    if (!firstVideo) {
+      return res.status(404).json({ error: "No video link found." });
+    }
 
     res.json({
-      success: true,
-      source: videoUrl,
-      video: firstVideo ? firstVideo.url : null,
-      audio: firstAudio ? firstAudio.url : null,
-      all_links: links,
+      video: firstVideo.url,          // رابط mp4 مباشر للبوت
+      title: "TikTok Video"           // عنوان افتراضي للبوت
     });
   } catch (err) {
     res.status(500).json({
@@ -48,6 +49,7 @@ app.get("/tiktok", async (req, res) => {
   }
 });
 
+// دالة استخراج الروابط من ssstik.io/ar-1
 async function fetchTikTokLinks(videoUrl) {
   // GET لجلب الصفحة أولاً
   await axios.get(BASE_URL, { headers: { "User-Agent": USER_AGENT } });
@@ -71,7 +73,6 @@ async function fetchTikTokLinks(videoUrl) {
 
   $("a").each((i, el) => {
     const href = $(el).attr("href") || "";
-    const text = ($(el).text() || "").trim().toLowerCase();
     if (!href.startsWith("http")) return;
 
     let type = "unknown";
@@ -79,7 +80,7 @@ async function fetchTikTokLinks(videoUrl) {
     if (href.includes(".mp3")) type = "audio";
 
     if (!links.find((l) => l.url === href)) {
-      links.push({ type, url: href, description: text || "Download" });
+      links.push({ type, url: href });
     }
   });
 
