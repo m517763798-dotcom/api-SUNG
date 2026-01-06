@@ -1,72 +1,51 @@
-import express from "express";
-import puppeteer from "puppeteer";
-import serverless from "serverless-http";
+const axios = require("axios");
+const cheerio = require("cheerio");
 
-const app = express();
-app.use(express.json());
-
-const BASE_URL = "https://ssstik.io/ar-1";
-
-app.get("/", (req, res) => {
-  res.json({ message: "Use /tiktok?url={TikTok_video_link}" });
-});
-
-app.get("/tiktok", async (req, res) => {
+module.exports = async (req, res) => {
   const videoUrl = req.query.url;
-  if (!videoUrl) {
-    return res.status(400).json({
-      error: "You must provide ?url=TikTok_video_link",
-      example: "/api/tiktok?url=https://www.tiktok.com/@user/video/1234567890",
-    });
-  }
+  if (!videoUrl) return res.status(400).json({ error: "Please provide a TikTok video URL using ?url=" });
 
-  let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    const BASE_URL = "https://snaptik.app/ar2";
+
+    // GET الصفحة الرئيسية
+    await axios.get(BASE_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+
+    // إعداد بيانات POST
+    const formData = new URLSearchParams();
+    formData.append("id", videoUrl);
+    formData.append("locale", "ar");
+    formData.append("tt", "");
+
+    // POST للحصول على HTML
+    const { data: html } = await axios.post(BASE_URL, formData.toString(), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0",
+        Origin: "https://snaptik.app",
+        Referer: BASE_URL,
+      },
+      timeout: 15000,
     });
 
-    const page = await browser.newPage();
-    await page.goto(BASE_URL, { waitUntil: "networkidle2", timeout: 60000 });
-
-    // إدخال رابط الفيديو
-    await page.type("#main_page_text", videoUrl);
-
-    // الضغط على الزر وإنتظار التحميل
-    await Promise.all([
-      page.click("#submit"),
-      page.waitForNavigation({ waitUntil: "networkidle2", timeout: 60000 }),
-    ]);
-
-    // استخراج روابط الفيديو
-    const links = await page.$$eval("a[href]", (anchors) =>
-      anchors
-        .map((a) => {
-          const href = a.href;
-          if (!href.startsWith("http")) return null;
-          if (href.includes(".mp4")) return { type: "video", url: href };
-          return null;
-        })
-        .filter(Boolean)
-    );
-
-    if (!links.length) {
-      return res.status(404).json({ error: "No video link found." });
-    }
-
-    const firstVideo = links[0];
-
-    res.json({
-      video: firstVideo.url,
-      title: "TikTok Video",
+    // استخراج روابط التحميل
+    const $ = cheerio.load(html);
+    const links = [];
+    $("a").each((i, el) => {
+      const href = $(el).attr("href") || "";
+      if (!href.startsWith("http")) return;
+      let type = "unknown";
+      if (href.includes(".mp4")) type = "video";
+      if (href.includes(".mp3")) type = "audio";
+      links.push({ type, url: href });
     });
+
+    if (links.length === 0) return res.json({ error: "No download links found" });
+
+    res.json({ videoUrl, links });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch TikTok video.", details: err.message });
-  } finally {
-    if (browser) await browser.close();
+    res.status(500).json({ error: "Internal server error" });
   }
-});
-
-export const handler = serverless(app);
+};
