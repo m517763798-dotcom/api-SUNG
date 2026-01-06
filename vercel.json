@@ -1,9 +1,10 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/tiktok.js", "use": "@vercel/node" }
+    { "src": "api/**/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/tiktok", "dest": "/api/tiktok.js" }
+    { "src": "/api$", "dest": "/api/index.js" },         // تغطية /api مباشرة
+    { "src": "/api/(.*)", "dest": "/api/$1.js" }        // باقي ملفات API
   ]
 }
