@@ -3,21 +3,20 @@ const cheerio = require("cheerio");
 
 module.exports = async (req, res) => {
   const videoUrl = req.query.url;
-  if (!videoUrl) return res.status(400).json({ error: "Please provide a TikTok video URL using ?url=" });
+  if (!videoUrl) return res.status(400).json({ error: "Please provide ?url=" });
 
   try {
     const BASE_URL = "https://snaptik.app/ar2";
 
-    // GET الصفحة الرئيسية
-    await axios.get(BASE_URL, { headers: { "User-Agent": "Mozilla/5.0" } });
+    // GET البداية (بعض المواقع تحتاج الGET قبل الPOST)
+    await axios.get(BASE_URL, { headers: { "User-Agent": "Mozilla/5.0" }, timeout: 15000 });
 
-    // إعداد بيانات POST
+    // إعداد POST
     const formData = new URLSearchParams();
     formData.append("id", videoUrl);
     formData.append("locale", "ar");
     formData.append("tt", "");
 
-    // POST للحصول على HTML
     const { data: html } = await axios.post(BASE_URL, formData.toString(), {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -25,27 +24,44 @@ module.exports = async (req, res) => {
         Origin: "https://snaptik.app",
         Referer: BASE_URL,
       },
-      timeout: 15000,
+      timeout: 20000,
     });
 
-    // استخراج روابط التحميل
+    // سجل HTML للبحث لو احتجت (يساعد في الديباغ)
+    console.log("HTML length:", html.length);
+
+    // استخراج الروابط مع فلترة أفضل
     const $ = cheerio.load(html);
     const links = [];
+
     $("a").each((i, el) => {
       const href = $(el).attr("href") || "";
       if (!href.startsWith("http")) return;
-      let type = "unknown";
-      if (href.includes(".mp4")) type = "video";
-      if (href.includes(".mp3")) type = "audio";
-      links.push({ type, url: href });
+
+      // فلترة روابط واضحة للفيديو/الصوت
+      if (href.includes(".mp4") || href.includes("/download?url=") || href.includes("/video/")) {
+        links.push(href);
+      }
     });
 
-    if (links.length === 0) return res.json({ error: "No download links found" });
+    // حاول استخراج أول رابط mp4 إن وُجد
+    const firstMp4 = links.find(u => u.includes(".mp4")) || links[0];
 
-    res.json({ videoUrl, links });
+    if (!firstMp4) {
+      console.log("No mp4 in HTML. sample anchors count:", $("a").length);
+      return res.status(404).json({ error: "No download links found" });
+    }
+
+    // إرجاع JSON بسيط للبوت
+    return res.json({
+      success: true,
+      source: videoUrl,
+      video: firstMp4,
+      links
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("API error:", err && err.message ? err.message : err);
+    return res.status(500).json({ error: "Internal server error", details: err.message || String(err) });
   }
 };
