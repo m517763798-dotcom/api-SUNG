@@ -4,7 +4,8 @@
     { "src": "api/**/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api$", "dest": "/api/index.js" },         // تغطية /api مباشرة
-    { "src": "/api/(.*)", "dest": "/api/$1.js" }        // باقي ملفات API
+    { "src": "/", "dest": "/api/index.js" },
+    { "src": "/api$", "dest": "/api/index.js" },
+    { "src": "/api/(.*)", "dest": "/api/$1.js" }
   ]
 }
